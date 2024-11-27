@@ -1,0 +1,6 @@
+Flask==2.2.3
+python-telegram-bot==20.0
+yfinance==0.2.20
+pandas==1.5.3
+numpy==1.23.5
+scikit-learn==1.2.2
