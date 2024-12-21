@@ -373,21 +373,42 @@ def home():
     logger.info("Requête reçue sur '/'")
     return jsonify({"status": "Bot de trading opérationnel."})
 
+async def trading_bot():
+    """Code métier : Gère la logique de trading."""
+    logger.info("Démarrage du bot de trading.")
+    while True:
+        try:
+            logger.info("Exécution d'un cycle de trading.")
+            # Simule la logique de trading (remplacez par vos appels API, calculs, etc.)
+            await asyncio.sleep(5)
+            logger.info("Cycle de trading terminé avec succès.")
+        except Exception as e:
+            logger.error(f"Erreur dans le bot de trading : {e}")
+
 async def run_flask():
-    logger.debug("Démarrage de l'application Flask.")
-    await asyncio.to_thread(app.run, host='0.0.0.0', port=PORT, threaded=True, use_reloader=False, debug=True)
-    logger.debug("Fin du démarrage de l'application Flask.")
+    """Démarrage du serveur Flask."""
+    logger.info("Démarrage de l'application Flask.")
+    try:
+        await asyncio.to_thread(app.run, host='0.0.0.0', port=PORT, threaded=True, use_reloader=False, debug=True)
+    except Exception as e:
+        logger.error(f"Erreur lors de l'exécution de Flask : {e}")
+    logger.info("Application Flask arrêtée.")
 
 async def main():
+    """Point d'entrée principal."""
     logger.info("Début de l'exécution principale.")
-    await asyncio.gather(
-        trading_bot(),
-        run_flask()
-    )
-    logger.info("Fin de l'exécution principale.")
+    try:
+        await asyncio.gather(
+            trading_bot(),
+            run_flask()
+        )
+    except Exception as e:
+        logger.error(f"Erreur inattendue dans asyncio.gather : {e}")
+    finally:
+        logger.info("Fin de l'exécution principale.")
 
 if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO)
+    logger.info("Lancement de l'application.")
     try:
         asyncio.run(main())
     except KeyboardInterrupt:
