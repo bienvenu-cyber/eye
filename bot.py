@@ -13,6 +13,7 @@ from datetime import datetime, timedelta
 from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LogisticRegression
 from sklearn.preprocessing import StandardScaler
+from logging.handlers import RotatingFileHandler  # Import de RotatingFileHandler
 
 # Activer la surveillance de la mémoire
 tracemalloc.start()
