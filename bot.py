@@ -53,7 +53,7 @@ app.logger.setLevel(logging.INFO)
 
 # Constantes
 CURRENCY = "USD"
-CRYPTO_LIST = ["BTC", "ETH"]
+CRYPTO_LIST = ["BTC", "ETH", "EUR", "CAD"]
 MAX_POSITION_PERCENTAGE = 0.1
 CAPITAL = 100
 PERFORMANCE_LOG = "trading_performance.csv"
@@ -333,7 +333,8 @@ async def trading_bot():
                     message = (f"Signal de trading pour {crypto}/{CURRENCY}: {signal}\n"
                                f"Prix d'entrée: {entry_price}\n"
                                f"Stop Loss: {sl_price}\n"
-                               f"Take Profit: {tp_price}\n")
+                               f"Take Profit: {tp_price}\n"
+                               f"Type : {'Crypto' if crypto in ['BTC', 'ETH'] else 'Fiat'}")
                     logger.debug(f"Envoi du message Telegram pour {crypto}: {message}")
                     await send_telegram_message(CHAT_ID, message)
                     logger.info(f"Message Telegram envoyé pour {crypto}: {signal}")
