@@ -53,7 +53,7 @@ app.logger.setLevel(logging.INFO)
 
 # Constantes
 CURRENCY = "USD"
-CRYPTO_LIST = ["BTC", "ETH"] 
+CRYPTO_LIST = ["BTC", "ETH"]
 MAX_POSITION_PERCENTAGE = 0.1
 CAPITAL = 100
 PERFORMANCE_LOG = "trading_performance.csv"
@@ -71,7 +71,7 @@ async def fetch_historical_data(crypto_symbol, currency="USD", interval="hour", 
         "fsym": crypto_symbol.upper(),
         "tsym": currency.upper(),
         "limit": limit,
-        "api_key": "799a75ef2ad318c38dfebc92c12723e54e5a650c7eb20159a324db632e35a1b4"
+        "api_key": os.getenv("CRYPTOCOMPARE_API_KEY")
     }
 
     attempt = 0
@@ -180,11 +180,12 @@ def calculate_advanced_indicators(prices):
     twenty_six_period_low = talib.MIN(lows, timeperiod=26)
     kijun_sen = (twenty_six_period_high + twenty_six_period_low) / 2
 
-    senkou_span_a = ((tenkan_sen + kijun_sen) / 2).shift(26)
+    # Shift operation is not directly supported by TA-Lib, use numpy for shifting arrays
+    senkou_span_a = np.roll((tenkan_sen + kijun_sen) / 2, 26)
     fifty_two_period_high = talib.MAX(highs, timeperiod=52)
     fifty_two_period_low = talib.MIN(lows, timeperiod=52)
-    senkou_span_b = ((fifty_two_period_high + fifty_two_period_low) / 2).shift(26)
-    chikou_span = closes.shift(-26)
+    senkou_span_b = np.roll((fifty_two_period_high + fifty_two_period_low) / 2, 26)
+    chikou_span = np.roll(closes, -26)
 
     # Calcul du RSI et divergence
     rsi = talib.RSI(closes, timeperiod=14)
@@ -359,4 +360,5 @@ async def handle_shutdown_signal(signum, frame):
     logger.info("Arrêt propre du bot.")
     sys.exit(0)
 
-def configure_signal
+def configure_signal_handlers(loop):
+    logger.debug("Configuration des gestionnaires
