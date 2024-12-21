@@ -345,7 +345,7 @@ async def trading_bot():
 
         # Vérification de la mémoire
         log_memory_usage()
-
+  
         # Attendre avant la prochaine itération
         logger.debug("Attente de 10 minutes avant la prochaine itération.")
         await asyncio.sleep(600)
@@ -362,4 +362,36 @@ async def handle_shutdown_signal(signum, frame):
     sys.exit(0)
 
 def configure_signal_handlers(loop):
-    logger.debug("Configuration des gestionnaires
+    logger.debug("Configuration des gestionnaires de signaux.")
+    for sig in (signal.SIGINT, signal.SIGTERM):
+        loop.add_signal_handler(sig, lambda sig=sig: asyncio.create_task(handle_shutdown_signal(sig, None)))
+    logger.debug("Fin de la configuration des gestionnaires de signaux.")
+
+@app.route("/")
+def home():
+    logger.info("Requête reçue sur '/'")
+    return jsonify({"status": "Bot de trading opérationnel."})
+
+async def run_flask():
+    logger.debug("Démarrage de l'application Flask.")
+    await asyncio.to_thread(app.run, host='0.0.0.0', port=PORT, threaded=True, use_reloader=False, debug=True)
+    logger.debug("Fin du démarrage de l'application Flask.")
+
+async def main():
+    logger.info("Début de l'exécution principale.")
+    await asyncio.gather(
+        trading_bot(),
+        run_flask()
+    )
+    logger.info("Fin de l'exécution principale.")
+
+if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO)
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        logger.info("Exécution interrompue par l'utilisateur.")
+    except Exception as e:
+        logger.error(f"Erreur inattendue : {e}")
+    finally:
+        logger.info("Arrêt complet.")
