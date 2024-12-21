@@ -28,7 +28,7 @@ logger.debug("Démarrage de l'application.")
 # Variables d'environnement
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
 CHAT_ID = os.getenv("CHAT_ID")
-PORT = int(os.getenv("PORT", 8002))
+PORT = int(os.getenv("PORT", 8004))
 
 if not TELEGRAM_TOKEN:
     logger.error("La variable d'environnement TELEGRAM_TOKEN est manquante. Veuillez la définir.")
