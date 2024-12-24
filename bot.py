@@ -355,7 +355,8 @@ async def handle_shutdown_signal(signum, frame):
 def configure_signal_handlers(loop):
     logger.debug("Configuration des gestionnaires de signaux.")
     for sig in (signal.SIGINT, signal.SIGTERM):
-        loop.add_signal_handler(sig, lambda sig=sig: asyncio.create_task(handle_shutdown_signal)
+        loop.add_signal_handler(sig, lambda sig=sig: asyncio.create_task(handle_shutdown_signal(sig, None)))
+    logger.debug("Fin de la configuration des gestionnaires de signaux.")
         
 @app.route("/")
 def home():
