@@ -31,6 +31,7 @@ COPY requirements.txt /app/requirements.txt
 COPY bot.py /app/bot.py
 
 # Ajouter les variables d'environnement
+ENV DISCORD_WEBHOOK_URL=https://discord.com/api/webhooks/1321172226908622879/asSC9QXdPDnCu7XrMeDzQfiWNlaG3Ui5diE28FYtEvbE8nxeeH9WjNcMSqQTLolgtpf2
 ENV PORT=8004
 
 # Installer les dépendances Python
