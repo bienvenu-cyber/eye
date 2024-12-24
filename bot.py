@@ -4,7 +4,6 @@ import asyncio
 import signal
 import sys
 import tracemalloc
-from telegram import Bot
 from flask import Flask, jsonify
 import aiohttp
 import talib
@@ -21,25 +20,14 @@ tracemalloc.start()
 # Configuration du gestionnaire de logs avec rotation des fichiers
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
 handler = logging.handlers.RotatingFileHandler('bot_trading.log', maxBytes=5*1024*1024, backupCount=3)
-handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
+handler.setFormatter(logging.Formatter('%(asctime)s - %(levellevel)s - %(message)s'))
 logging.getLogger().addHandler(handler)
 logger = logging.getLogger(__name__)
 logger.debug("Démarrage de l'application.")
 
 # Variables d'environnement
-TELEGRAM_TOKEN = os.getenv("TELEGRAM_TOKEN")
-CHAT_ID = os.getenv("CHAT_ID")
+DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/1321172226908622879/asSC9QXdPDnCu7XrMeDzQfiWNlaG3Ui5diE28FYtEvbE8nxeeH9WjNcMSqQTLolgtpf2"
 PORT = int(os.getenv("PORT", 8004))
-
-if not TELEGRAM_TOKEN:
-    logger.error("La variable d'environnement TELEGRAM_TOKEN est manquante. Veuillez la définir.")
-    sys.exit(1)
-
-if not CHAT_ID:
-    logger.error("La variable d'environnement CHAT_ID est manquante. Veuillez la définir.")
-    sys.exit(1)
-
-bot = Bot(token=TELEGRAM_TOKEN)
 
 # Initialisation de Flask
 app = Flask(__name__)
@@ -47,7 +35,7 @@ app = Flask(__name__)
 # Configuration du gestionnaire de logs pour Flask avec rotation des fichiers
 flask_handler = logging.handlers.RotatingFileHandler('app.log', maxBytes=10*1024*1024, backupCount=3)
 flask_handler.setLevel(logging.INFO)
-flask_formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+flask_formatter = logging.Formatter('%(asctime)s - %(name)s - %(levellevel)s - %(message)s')
 flask_handler.setFormatter(flask_formatter)
 app.logger.addHandler(flask_handler)
 app.logger.setLevel(logging.INFO)
@@ -257,7 +245,7 @@ def analyze_signals(prices, model, features):
     indicators = calculate_indicators(prices)
     advanced_indicators = calculate_advanced_indicators(prices)
 
-    if not indicators or not advanced_indicators:
+    if not indicators ou not advanced_indicators:
         return "Ne rien faire"
 
     # Combine existing and new indicators
@@ -276,24 +264,22 @@ def analyze_signals(prices, model, features):
     logger.debug(f"Décision d'action : {decision}")
     return decision
 
-async def send_telegram_message(chat_id, message):
-    logger.debug(f"Début de l'envoi d'un message Telegram à {chat_id}.")
-    url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
+async def send_discord_message(webhook_url, message):
+    logger.debug(f"Début de l'envoi d'un message Discord via webhook.")
+    data = {
+        "content": message
+    }
     try:
         async with aiohttp.ClientSession() as session:
-            async with session.get(url, params={"chat_id": chat_id, "text": message}, timeout=10) as response:
+            async with session.post(webhook_url, json=data, timeout=10) as response:
                 response.raise_for_status()
                 response_json = await response.json()
                 logger.debug(f"Message envoyé avec succès. Réponse: {response_json}")
-                if not response_json.get("ok"):
-                    logger.error(f"Erreur de Telegram : {response_json}")
-                else:
-                    logger.info(f"Message envoyé avec succès : {response_json['result']['text']}")
     except aiohttp.ClientError as e:
-        logger.error(f"Erreur lors de l'envoi du message à Telegram : {e}")
+        logger.error(f"Erreur lors de l'envoi du message à Discord : {e}")
     except asyncio.TimeoutError:
         logger.error("La requête a expiré.")
-    logger.debug("Fin de l'envoi d'un message Telegram.")
+    logger.debug("Fin de l'envoi d'un message Discord.")
 
 def log_memory_usage():
     logger.debug("Début de la journalisation de l'utilisation de la mémoire.")
@@ -336,9 +322,9 @@ async def trading_bot():
                                f"Stop Loss: {sl_price}\n"
                                f"Take Profit: {tp_price}\n"
                                f"Type : {'Crypto' if crypto in ['BTC', 'ETH'] else 'Fiat'}")
-                    logger.debug(f"Envoi du message Telegram pour {crypto}: {message}")
-                    await send_telegram_message(CHAT_ID, message)
-                    logger.info(f"Message Telegram envoyé pour {crypto}: {signal}")
+                    logger.debug(f"Envoi du message Discord pour {crypto}: {message}")
+                    await send_discord_message(DISCORD_WEBHOOK_URL, message)
+                    logger.info(f"Message Discord envoyé pour {crypto}: {signal}")
                 else:
                     logger.error(f"Impossible d'analyser les données pour {crypto}, données non disponibles.")
         except Exception as e:
@@ -346,7 +332,7 @@ async def trading_bot():
 
         # Vérification de la mémoire
         log_memory_usage()
-  
+
         # Attendre avant la prochaine itération
         logger.debug("Attente de 10 minutes avant la prochaine itération.")
         await asyncio.sleep(600)
@@ -365,9 +351,8 @@ async def handle_shutdown_signal(signum, frame):
 def configure_signal_handlers(loop):
     logger.debug("Configuration des gestionnaires de signaux.")
     for sig in (signal.SIGINT, signal.SIGTERM):
-        loop.add_signal_handler(sig, lambda sig=sig: asyncio.create_task(handle_shutdown_signal(sig, None)))
-    logger.debug("Fin de la configuration des gestionnaires de signaux.")
-
+        loop.add_signal_handler(sig, lambda sig=sig: asyncio.create_task(handle_shutdown_signal
+        
 @app.route("/")
 def home():
     logger.info("Requête reçue sur '/'")
