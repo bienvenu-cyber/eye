@@ -20,14 +20,18 @@ tracemalloc.start()
 # Configuration du gestionnaire de logs avec rotation des fichiers
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
 handler = logging.handlers.RotatingFileHandler('bot_trading.log', maxBytes=5*1024*1024, backupCount=3)
-handler.setFormatter(logging.Formatter('%(asctime)s - %(levellevel)s - %(message)s'))
+handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
 logging.getLogger().addHandler(handler)
 logger = logging.getLogger(__name__)
 logger.debug("Démarrage de l'application.")
 
 # Variables d'environnement
-DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/1321172226908622879/asSC9QXdPDnCu7XrMeDzQfiWNlaG3Ui5diE28FYtEvbE8nxeeH9WjNcMSqQTLolgtpf2"
+DISCORD_WEBHOOK_URL = os.getenv("DISCORD_WEBHOOK_URL")
 PORT = int(os.getenv("PORT", 8004))
+
+if not DISCORD_WEBHOOK_URL:
+    logger.error("La variable d'environnement DISCORD_WEBHOOK_URL est manquante. Veuillez la définir.")
+    sys.exit(1)
 
 # Initialisation de Flask
 app = Flask(__name__)
@@ -35,7 +39,7 @@ app = Flask(__name__)
 # Configuration du gestionnaire de logs pour Flask avec rotation des fichiers
 flask_handler = logging.handlers.RotatingFileHandler('app.log', maxBytes=10*1024*1024, backupCount=3)
 flask_handler.setLevel(logging.INFO)
-flask_formatter = logging.Formatter('%(asctime)s - %(name)s - %(levellevel)s - %(message)s')
+flask_formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 flask_handler.setFormatter(flask_formatter)
 app.logger.addHandler(flask_handler)
 app.logger.setLevel(logging.INFO)
@@ -245,7 +249,7 @@ def analyze_signals(prices, model, features):
     indicators = calculate_indicators(prices)
     advanced_indicators = calculate_advanced_indicators(prices)
 
-    if not indicators ou not advanced_indicators:
+    if not indicators or not advanced_indicators or len(indicators) == 0 or len(advanced_indicators) == 0:
         return "Ne rien faire"
 
     # Combine existing and new indicators
@@ -332,7 +336,7 @@ async def trading_bot():
 
         # Vérification de la mémoire
         log_memory_usage()
-
+  
         # Attendre avant la prochaine itération
         logger.debug("Attente de 10 minutes avant la prochaine itération.")
         await asyncio.sleep(600)
