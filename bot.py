@@ -46,7 +46,7 @@ app.logger.setLevel(logging.INFO)
 
 # Constantes
 CURRENCY = "USD"
-CRYPTO_LIST = ["BTC", "ETH", "EUR", "CAD"]
+CRYPTO_LIST = ["BTC", "ETH", "EUR", "CAD", "JPY", "GBP", "NZD", "AUD", "XAU"]
 MAX_POSITION_PERCENTAGE = 0.1
 CAPITAL = 100
 PERFORMANCE_LOG = "trading_performance.csv"
