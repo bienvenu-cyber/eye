@@ -358,9 +358,16 @@ def configure_signal_handlers(loop):
         loop.add_signal_handler(sig, lambda sig=sig: asyncio.create_task(handle_shutdown_signal(sig, None)))
     logger.debug("Fin de la configuration des gestionnaires de signaux.")
         
+# Route de health check
 @app.route("/")
-def home():
+def health_check():
     logger.info("Requête reçue sur '/'")
+    return "OK", 200
+
+# Route pour vérifier le statut
+@app.route("/home")
+def home():
+    logger.info("Requête reçue sur '/home'")
     return jsonify({"status": "Bot de trading opérationnel."})
 
 async def run_flask():
