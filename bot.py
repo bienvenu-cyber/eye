@@ -46,7 +46,7 @@ app.logger.setLevel(logging.INFO)
 
 # Constantes
 CURRENCY = "USD"
-CRYPTO_LIST = ["BTC", "ETH", "EUR", "CAD", "JPY", "GBP", "NZD", "AUD", "XAU"]
+CRYPTO_LIST = ["BTC", "ETH", "EUR", "CAD"]
 MAX_POSITION_PERCENTAGE = 0.1
 CAPITAL = 100
 PERFORMANCE_LOG = "trading_performance.csv"
@@ -341,8 +341,8 @@ async def trading_bot():
   
         # Attendre avant la prochaine itération
         logger.debug("Attente de 10 minutes avant la prochaine itération.")
-        await asyncio.sleep(600)
-        logger.debug("Fin de l'attente de 10 minutes.")
+        await asyncio.sleep(1800)
+        logger.debug("Fin de l'attente de 30 minutes.")
     logger.info("Fin de la tâche de trading.")
 
 async def handle_shutdown_signal(signum, frame):
