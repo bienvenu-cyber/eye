@@ -337,16 +337,20 @@ scheduler.start()
 # Gestionnaire de signaux pour l'arrêt propre du bot
 async def handle_shutdown_signal(signum, frame):
     logger.info(f"Signal d'arrêt reçu : {signum}")
+    
+    # Annuler toutes les tâches en cours, sauf la tâche actuelle
     tasks = [t for t in asyncio.all_tasks() if t is not asyncio.current_task()]
     for task in tasks:
         task.cancel()
+    
+    # Attendre que toutes les tâches soient annulées proprement
     await asyncio.gather(*tasks, return_exceptions=True)
-        logger.info("Arrêt propre du bot.")
-    sys.exit(0)
+    logger.info("Arrêt propre du bot.")
+    sys.exit(0)  # Quitte proprement le programme
 
 def configure_signal_handlers(loop):
     logger.debug("Configuration des gestionnaires de signaux.")
-    for sig in (signal.SIGINT, signal.SIGTERM):
+    for sig in (signal.SIGINT, signal.SIGTERM):  # Gestion des signaux d'interruption
         loop.add_signal_handler(sig, lambda sig=sig: asyncio.create_task(handle_shutdown_signal(sig, None)))
     logger.debug("Fin de la configuration des gestionnaires de signaux.")
         
