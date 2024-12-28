@@ -67,7 +67,7 @@ async def fetch_historical_data(crypto_symbol, currency="USD", interval="hour", 
         "fsym": crypto_symbol.upper(),
         "tsym": currency.upper(),
         "limit": limit,
-        "api_key": os.getenv("799a75ef2ad318c38dfebc92c12723e54e5a650c7eb20159a324db632e35a1b4")
+        "api_key": "799a75ef2ad318c38dfebc92c12723e54e5a650c7eb20159a324db632e35a1b4"
     }
 
     attempt = 0
