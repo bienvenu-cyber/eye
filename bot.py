@@ -1,33 +1,36 @@
 import os
+import requests
+import numpy as np
+import pandas as pd
+import time
 import logging
+from flask import Flask, jsonify
 import asyncio
 import signal
 import sys
 import tracemalloc
-from flask import Flask, jsonify
-import aiohttp
 import talib
-import numpy as np
-from datetime import datetime, timedelta
-from sklearn.model_selection import train_test_split
+from logging.handlers import RotatingFileHandler
+import aiohttp
+import datetime
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from sklearn.linear_model import LogisticRegression
-from sklearn.preprocessing import StandardScaler
-from logging.handlers import RotatingFileHandler  # Import de RotatingFileHandler
+from textblob import TextBlob
 
 # Activer la surveillance de la mémoire
 tracemalloc.start()
 
 # Configuration du gestionnaire de logs avec rotation des fichiers
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
-handler = logging.handlers.RotatingFileHandler('bot_trading.log', maxBytes=5*1024*1024, backupCount=3)
-handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
+handler = RotatingFileHandler('bot_trading.log', maxBytes=5*1024*1024, backupCount=3)
+handler.setFormatter(logging.Formatter('%(asctime)s - %(levellevel)s - %(message)s'))
 logging.getLogger().addHandler(handler)
 logger = logging.getLogger(__name__)
 logger.debug("Démarrage de l'application.")
 
 # Variables d'environnement
 DISCORD_WEBHOOK_URL = os.getenv("DISCORD_WEBHOOK_URL")
-PORT = int(os.getenv("PORT", 8004))
+PORT = int(os.getenv("PORT", 8002))
 
 if not DISCORD_WEBHOOK_URL:
     logger.error("La variable d'environnement DISCORD_WEBHOOK_URL est manquante. Veuillez la définir.")
@@ -37,23 +40,23 @@ if not DISCORD_WEBHOOK_URL:
 app = Flask(__name__)
 
 # Configuration du gestionnaire de logs pour Flask avec rotation des fichiers
-flask_handler = logging.handlers.RotatingFileHandler('app.log', maxBytes=10*1024*1024, backupCount=3)
+flask_handler = RotatingFileHandler('app.log', maxBytes=10*1024*1024, backupCount=3)
 flask_handler.setLevel(logging.INFO)
-flask_formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+flask_formatter = logging.Formatter('%(asctime)s - %(name)s - %(levellevel)s - %(message)s')
 flask_handler.setFormatter(flask_formatter)
 app.logger.addHandler(flask_handler)
 app.logger.setLevel(logging.INFO)
 
 # Constantes
 CURRENCY = "USD"
-CRYPTO_LIST = ["BTC", "ETH", "EUR", "CAD"]
+CRYPTO_LIST = ["BTC", "ETH"]
 MAX_POSITION_PERCENTAGE = 0.1
 CAPITAL = 100
 PERFORMANCE_LOG = "trading_performance.csv"
 SIGNAL_LOG = "signal_log.csv"
 
 # Récupération des données historiques pour les cryptomonnaies
-async def fetch_historical_data(crypto_symbol, currency="USD", interval="hour", limit=2000, max_retries=5, backoff_factor=2):
+async def fetch_historical_data(crypto_symbol, currency="USD", interval="hour", limit=100, max_retries=5, backoff_factor=2):
     logger.debug(f"Début de la récupération des données historiques pour {crypto_symbol}.")
     base_url = "https://min-api.cryptocompare.com/data/v2/"
 
@@ -64,7 +67,7 @@ async def fetch_historical_data(crypto_symbol, currency="USD", interval="hour", 
         "fsym": crypto_symbol.upper(),
         "tsym": currency.upper(),
         "limit": limit,
-        "api_key": "799a75ef2ad318c38dfebc92c12723e54e5a650c7eb20159a324db632e35a1b4"
+        "api_key": os.getenv("799a75ef2ad318c38dfebc92c12723e54e5a650c7eb20159a324db632e35a1b4")
     }
 
     attempt = 0
@@ -119,9 +122,8 @@ async def fetch_historical_data(crypto_symbol, currency="USD", interval="hour", 
 # Fonction de calcul des indicateurs avec TA-Lib
 def calculate_indicators(prices):
     logger.debug("Début du calcul des indicateurs.")
-    if len(prices) < 26:
-        logger.error("Pas assez de données pour calculer les indicateurs.")
-        return {}
+    if len(prices) < 50:
+        raise ValueError("Pas assez de données pour calculer les indicateurs.")
 
     opens = np.array([price["open"] for price in prices])
     highs = np.array([price["high"] for price in prices])
@@ -129,7 +131,7 @@ def calculate_indicators(prices):
     closes = np.array([price["close"] for price in prices])
 
     sma_short = talib.SMA(closes, timeperiod=10)[-1]
-    sma_long = talib.SMA(closes, timeperiod=20)[-1]
+    sma_long = talib.SMA(closes, timeperiod=50)[-1]
     ema_short = talib.EMA(closes, timeperiod=12)[-1]
     ema_long = talib.EMA(closes, timeperiod=26)[-1]
     macd, macd_signal, macd_hist = talib.MACD(closes, fastperiod=12, slowperiod=26, signalperiod=9)
@@ -137,8 +139,10 @@ def calculate_indicators(prices):
     upper_band, middle_band, lower_band = talib.BBANDS(closes, timeperiod=20, nbdevup=2, nbdevdn=2, matype=0)
     rsi = talib.RSI(closes, timeperiod=14)[-1]
     slowk, slowd = talib.STOCH(highs, lows, closes, fastk_period=14, slowk_period=3, slowd_period=3)
+    adx = talib.ADX(highs, lows, closes, timeperiod=14)[-1]
+    cci = talib.CCI(highs, lows, closes, timeperiod=14)[-1]
 
-    logger.debug(f"Indicateurs calculés : SMA_short={sma_short}, SMA_long={sma_long}, EMA_short={ema_short}, EMA_long={ema_long}, MACD={macd[-1]}, ATR={atr}, Upper_Band={upper_band[-1]}, Lower_Band={lower_band[-1]}, RSI={rsi}, Stochastic_K={slowk[-1]}, Stochastic_D={slowd[-1]}")
+    logger.debug(f"Indicateurs calculés : SMA_short={sma_short}, SMA_long={sma_long}, EMA_short={ema_short}, EMA_long={ema_long}, MACD={macd[-1]}, ATR={atr}, Upper_Band={upper_band[-1]}, Lower_Band={lower_band[-1]}, RSI={rsi}, Stochastic_K={slowk[-1]}, Stochastic_D={slowd[-1]}, ADX={adx}, CCI={cci}")
     return {
         "SMA_short": sma_short,
         "SMA_long": sma_long,
@@ -151,82 +155,71 @@ def calculate_indicators(prices):
         "RSI": rsi,
         "Stochastic_K": slowk[-1],
         "Stochastic_D": slowd[-1],
+        "ADX": adx,
+        "CCI": cci
     }
 
-# Calcul des indicateurs avancés
-def calculate_advanced_indicators(prices):
-    logger.debug("Début du calcul des indicateurs avancés.")
-    if len(prices) < 52:  # L'Ichimoku Cloud nécessite au moins 52 périodes
-        logger.error("Pas assez de données pour calculer les indicateurs avancés.")
-        return {}
+# Récupération des nouvelles financières et du sentiment des réseaux sociaux
+async def fetch_sentiment():
+    sentiment_score = 0
+    try:
+        news_api_key = "ctnbgc9r01qn483k4hj0ctnbgc9r01qn483k4hjg"
+        news_url = f"https://finnhub.io/api/v1/news?category=general&token={news_api_key}"
+        async with aiohttp.ClientSession() as session:
+            async with session.get(news_url) as response:
+                response.raise_for_status()
+                news_data = await response.json()  # Ici, news_data est une liste
+                if not news_data:  # Vérifie si la liste est vide
+                    logger.warning("Aucune donnée reçue de l'API de nouvelles.")
+                    return sentiment_score
+                
+                for article in news_data:  # Parcourir chaque article dans la liste
+                    description = article.get("summary", "")  # Utilise la clé "summary" pour le contenu
+                    if description:  # Assure-toi que la description existe
+                        analysis = TextBlob(description)
+                        sentiment_score += analysis.sentiment.polarity
+                
+                if len(news_data) > 0:
+                    sentiment_score /= len(news_data)  # Calcul de la moyenne des sentiments
+    except Exception as e:
+        logger.error(f"Erreur lors de la récupération des nouvelles financières : {e}")
+    return sentiment_score
 
-    closes = np.array([price["close"] for price in prices])
-    highs = np.array([price["high"] for price in prices])
-    lows = np.array([price["low"] for price in prices])
-
-    # Calcul de l'Ichimoku Cloud
-    nine_period_high = talib.MAX(highs, timeperiod=9)
-    nine_period_low = talib.MIN(lows, timeperiod=9)
-    tenkan_sen = (nine_period_high + nine_period_low) / 2
-
-    twenty_six_period_high = talib.MAX(highs, timeperiod=26)
-    twenty_six_period_low = talib.MIN(lows, timeperiod=26)
-    kijun_sen = (twenty_six_period_high + twenty_six_period_low) / 2
-
-    # Shift operation is not directly supported by TA-Lib, use numpy for shifting arrays
-    senkou_span_a = np.roll((tenkan_sen + kijun_sen) / 2, 26)
-    fifty_two_period_high = talib.MAX(highs, timeperiod=52)
-    fifty_two_period_low = talib.MIN(lows, timeperiod=52)
-    senkou_span_b = np.roll((fifty_two_period_high + fifty_two_period_low) / 2, 26)
-    chikou_span = np.roll(closes, -26)
-
-    # Calcul du RSI et divergence
-    rsi = talib.RSI(closes, timeperiod=14)
-    rsi_divergence = closes - rsi  # Exemple simplifié de divergence
-
-    logger.debug(f"Indicateurs avancés calculés : Tenkan-sen={tenkan_sen[-1]}, Kijun-sen={kijun_sen[-1]}, Senkou Span A={senkou_span_a[-1]}, Senkou Span B={senkou_span_b[-1]}, Chikou Span={chikou_span[-1]}, RSI={rsi[-1]}, RSI Divergence={rsi_divergence[-1]}")
-
-    return {
-        "Tenkan_sen": tenkan_sen[-1],
-        "Kijun_sen": kijun_sen[-1],
-        "Senkou_Span_A": senkou_span_a[-1],
-        "Senkou_Span_B": senkou_span_b[-1],
-        "Chikou_Span": chikou_span[-1],
-        "RSI": rsi[-1],
-        "RSI_Divergence": rsi_divergence[-1],
-    }
-
-# Préparation des données pour le machine learning
-def prepare_ml_data(prices):
-    closes = np.array([price["close"] for price in prices])
-    highs = np.array([price["high"] for price in prices])
-    lows = np.array([price["low"] for price in prices])
-    volumes = np.array([price["volume"] for price in prices])
-
-    # Créer des features (caractéristiques)
-    features = np.column_stack((closes, highs, lows, volumes))
-    target = (np.roll(closes, -1) > closes).astype(int)  # 1 si le prix augmente, 0 sinon
-
-    # Normaliser les features
-    scaler = StandardScaler()
-    features = scaler.fit_transform(features)
-
-    return features[:-1], target[:-1]  # Exclure la dernière ligne de target
+# Préparation des données pour l'entraînement
+def prepare_data(prices, sentiment_score):
+    indicators = calculate_indicators(prices)
+    data = pd.DataFrame(indicators, index=[0])
+    data['Sentiment'] = sentiment_score
+    data['Price'] = [price["close"] for price in prices][-1]
+    return data
 
 # Entraînement du modèle de machine learning
-def train_ml_model(features, target):
-    X_train, X_test, y_train, y_test = train_test_split(features, target, test_size=0.2, random_state=42)
+def train_model(data):
+    X = data[['SMA_short', 'SMA_long', 'EMA_short', 'EMA_long', 'MACD', 'ATR', 'Upper_Band', 'Lower_Band', 'RSI', 'Stochastic_K', 'Stochastic_D', 'ADX', 'CCI', 'Sentiment']]
+    y = (data['Price'].shift(-1) > data['Price']).astype(int)
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
     model = LogisticRegression()
     model.fit(X_train, y_train)
-    score = model.score(X_test, y_test)
-    logger.info(f"Précision du modèle de machine learning : {score}")
     return model
 
-# Prédiction avec le modèle de machine learning
-def predict_with_ml(model, features):
-    prediction = model.predict(features[-1].reshape(1, -1))
-    return "Acheter" if prediction == 1 else "Vendre"
+# Prédiction des signaux avec le modèle de machine learning
+def predict_signals(model, data):
+    X = data[['SMA_short', 'SMA_long', 'EMA_short', 'EMA_long', 'MACD', 'ATR', 'Upper_Band', 'Lower_Band', 'RSI', 'Stochastic_K', 'Stochastic_D', 'ADX', 'CCI', 'Sentiment']]
+    data['Signal'] = model.predict(X)
+    return data
 
+# Fonction principale d'analyse des signaux
+async def analyze_signals(prices):
+    logger.debug("Début de l'analyse des signaux.")
+    sentiment_score = await fetch_sentiment()
+    data = prepare_data(prices, sentiment_score)
+    model = train_model(data)
+    signals = predict_signals(model, data)
+    signal = signals['Signal'].iloc[-1]
+    logger.debug(f"Signal prédicté : {signal}")
+    return "Acheter" if signal == 1 else "Vendre"
+
+# Calcul des niveaux Stop Loss et Take Profit
 def calculate_sl_tp(entry_price, signal_type, atr, multiplier=1.5):
     logger.debug("Début du calcul des niveaux Stop Loss et Take Profit.")
     if signal_type == "Acheter":
@@ -240,34 +233,9 @@ def calculate_sl_tp(entry_price, signal_type, atr, multiplier=1.5):
         return None, None
 
     logger.debug(f"Stop Loss calculé à : {sl_price}, Take Profit calculé à : {tp_price} (Prix d'entrée : {entry_price})")
-    logger.debug("Fin du calcul des niveaux Stop Loss et Take Profit.")
     return sl_price, tp_price
 
-# Analyse des signaux en utilisant les indicateurs avancés et le machine learning
-def analyze_signals(prices, model, features):
-    logger.debug("Début de l'analyse des signaux avec indicateurs avancés.")
-    indicators = calculate_indicators(prices)
-    advanced_indicators = calculate_advanced_indicators(prices)
-
-    if not indicators or not advanced_indicators or len(indicators) == 0 or len(advanced_indicators) == 0:
-        return "Ne rien faire"
-
-    # Combine existing and new indicators
-    if indicators['RSI'] < 30 and advanced_indicators['RSI_Divergence'] > 0:
-        decision = "Acheter"
-    elif indicators['RSI'] > 70 and advanced_indicators['RSI_Divergence'] < 0:
-        decision = "Vendre"
-    elif advanced_indicators['Tenkan_sen'] > advanced_indicators['Kijun_sen'] and prices[-1]['close'] > advanced_indicators['Senkou_Span_A']:
-        decision = "Acheter"
-    elif advanced_indicators['Tenkan_sen'] < advanced_indicators['Kijun_sen'] and prices[-1]['close'] < advanced_indicators['Senkou_Span_B']:
-        decision = "Vendre"
-    else:
-        ml_signal = predict_with_ml(model, features)
-        decision = ml_signal
-
-    logger.debug(f"Décision d'action : {decision}")
-    return decision
-
+# Envoi de message à Discord
 async def send_discord_message(webhook_url, message):
     logger.debug(f"Début de l'envoi d'un message Discord via webhook.")
     data = {
@@ -281,12 +249,11 @@ async def send_discord_message(webhook_url, message):
                 logger.debug(f"Message envoyé avec succès. Réponse: {response_text}")
     except aiohttp.ClientError as e:
         logger.error(f"Erreur lors de l'envoi du message à Discord : {e}")
-        response_text = await response.text()
-        logger.error(f"Contenu de la réponse : {response_text}")
     except asyncio.TimeoutError:
         logger.error("La requête a expiré.")
     logger.debug("Fin de l'envoi d'un message Discord.")
-    
+
+# Journalisation de l'utilisation de la mémoire
 def log_memory_usage():
     logger.debug("Début de la journalisation de l'utilisation de la mémoire.")
     current, peak = tracemalloc.get_traced_memory()
@@ -294,31 +261,26 @@ def log_memory_usage():
     tracemalloc.clear_traces()
     logger.debug("Fin de la journalisation de l'utilisation de la mémoire.")
 
+# Fonction principale du bot de trading
 async def trading_bot():
     logger.info("Début de la tâche de trading.")
     last_sent_signals = {}
-    model = None  # Initialiser le modèle de machine learning
     while True:
         logger.info("Début d'une nouvelle itération de trading.")
-        try:
-            for crypto in CRYPTO_LIST:
-                logger.debug(f"Récupération des données historiques pour {crypto}.")
-                prices, opens, highs, lows, closes, volumes = await fetch_historical_data(crypto, CURRENCY)
-                if prices:
-                    logger.debug(f"Données récupérées pour {crypto}: {prices[-1]}")
-                    if not model:
-                        features, target = prepare_ml_data(prices)
-                        model = train_ml_model(features, target)
-                    else:
-                        features, _ = prepare_ml_data(prices)  # Préparer les nouvelles features pour la prédiction
-                    signal = analyze_signals(prices, model, features)
-                    logger.debug(f"Signal analysé pour {crypto} avec ML: {signal}")
+        for crypto in CRYPTO_LIST:
+            logger.debug(f"Récupération des données historiques pour {crypto}.")
+            prices, opens, highs, lows, closes, volumes = await fetch_historical_data(crypto, CURRENCY)
+            if prices:
+                logger.debug(f"Données récupérées pour {crypto}: {prices[-1]}")
+                signal = await analyze_signals(prices)
+                if signal:
+                    logger.debug(f"Signal analysé pour {crypto}: {signal}")
                     if last_sent_signals.get(crypto) == signal:
                         logger.info(f"Signal déjà envoyé pour {crypto}. Ignoré.")
                         continue
                     last_sent_signals[crypto] = signal
                     entry_price = prices[-1]["close"]
-                    atr = talib.ATR(highs, lows, closes, timeperiod=14)[-1]  # Calcul de l'ATR
+                    atr = talib.ATR(highs, lows, closes, timeperiod=14)[-1]
                     sl_price, tp_price = calculate_sl_tp(entry_price, signal, atr)
                     if sl_price is None or tp_price is None:
                         logger.error(f"Erreur dans le calcul des niveaux SL/TP pour {crypto}")
@@ -326,32 +288,60 @@ async def trading_bot():
                     message = (f"Signal de trading pour {crypto}/{CURRENCY}: {signal}\n"
                                f"Prix d'entrée: {entry_price}\n"
                                f"Stop Loss: {sl_price}\n"
-                               f"Take Profit: {tp_price}\n"
-                               f"Type : {'Crypto' if crypto in ['BTC', 'ETH'] else 'Fiat'}")
+                               f"Take Profit: {tp_price}\n")
                     logger.debug(f"Envoi du message Discord pour {crypto}: {message}")
                     await send_discord_message(DISCORD_WEBHOOK_URL, message)
                     logger.info(f"Message Discord envoyé pour {crypto}: {signal}")
-                else:
-                    logger.error(f"Impossible d'analyser les données pour {crypto}, données non disponibles.")
-        except Exception as e:
-            logger.error(f"Erreur inattendue dans la boucle de trading : {e}")
+                logger.info(f"Signal généré pour {crypto}/{CURRENCY}: {signal}")
+            else:
+                logger.error(f"Impossible d'analyser les données pour {crypto}, données non disponibles.")
 
         # Vérification de la mémoire
         log_memory_usage()
-  
+
         # Attendre avant la prochaine itération
-        logger.debug("Attente de 10 minutes avant la prochaine itération.")
-        await asyncio.sleep(1800)
-        logger.debug("Fin de l'attente de 30 minutes.")
+        logger.debug("Attente de 15 minutes avant la prochaine itération.")
+        await asyncio.sleep(900)
+        logger.debug("Fin de l'attente de 15 minutes.")
     logger.info("Fin de la tâche de trading.")
 
+# Envoi d'un résumé journalier sur Discord
+async def send_daily_summary(webhook_url):
+    logger.debug("Début de l'envoi du résumé journalier sur Discord.")
+    try:
+        df = pd.read_csv(PERFORMANCE_LOG)
+        df['timestamp'] = pd.to_datetime(df['timestamp'])
+        today = datetime.datetime.utcnow().date()
+        daily_trades = df[df['timestamp'].dt.date == today]
+        
+        if not daily_trades.empty:
+            summary = daily_trades.to_string(index=False)
+            message = f"Résumé des trades du {today}:\n\n{summary}"
+        else:
+            message = f"Aucun trade effectué le {today}."
+
+        data = {"content": message}
+        async with aiohttp.ClientSession() as session:
+            async with session.post(webhook_url, json=data, timeout=10) as response:
+                response.raise_for_status()
+                response_text = await response.text()
+                logger.debug(f"Résumé journalier envoyé avec succès. Réponse: {response_text}")
+    except Exception as e:
+        logger.error(f"Erreur lors de l'envoi du résumé journalier : {e}")
+    logger.debug("Fin de l'envoi du résumé journalier sur Discord.")
+
+scheduler = AsyncIOScheduler()
+scheduler.add_job(send_daily_summary, 'interval', days=1, args=[DISCORD_WEBHOOK_URL], next_run_time=datetime.datetime.now() + datetime.timedelta(seconds=10))
+scheduler.start()
+
+# Gestionnaire de signaux pour l'arrêt propre du bot
 async def handle_shutdown_signal(signum, frame):
     logger.info(f"Signal d'arrêt reçu : {signum}")
     tasks = [t for t in asyncio.all_tasks() if t is not asyncio.current_task()]
     for task in tasks:
         task.cancel()
     await asyncio.gather(*tasks, return_exceptions=True)
-    logger.info("Arrêt propre du bot.")
+        logger.info("Arrêt propre du bot.")
     sys.exit(0)
 
 def configure_signal_handlers(loop):
