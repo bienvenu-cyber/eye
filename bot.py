@@ -56,7 +56,7 @@ CAPITAL = 100
 PERFORMANCE_LOG = "trading_performance.csv"
 SIGNAL_LOG = "signal_log.csv"
 
-async def fetch_historical_data(crypto_symbol, currency="USD", interval="hour", limit=2000, max_retries=5, backoff_factor=2):
+async def fetch_historical_data(crypto_symbol, currency="USD", interval="hour", limit=500, max_retries=5, backoff_factor=2):
     logger.debug(f"Début de la récupération des données historiques pour {crypto_symbol}.")
     base_url = "https://min-api.cryptocompare.com/data/v2/"
     endpoint = "histohour" if interval == "hour" else "histoday"
@@ -326,7 +326,7 @@ async def handle_shutdown_signal(signum, frame):
         task.cancel()
     await asyncio.gather(*tasks, return_exceptions=True)
     logger.info("Arrêt propre du bot.")
-    sys.exit(
+    sys.exit(0)
     
     def configure_signal_handlers(loop):
     logger.debug("Configuration des gestionnaires de signaux.")
