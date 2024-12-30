@@ -30,7 +30,7 @@ logger.debug("Démarrage de l'application.")
 
 # Variables d'environnement
 DISCORD_WEBHOOK_URL = os.getenv("DISCORD_WEBHOOK_URL")
-PORT = int(os.getenv("PORT", 8002))
+PORT = int(os.getenv("PORT", 8004))
 
 if not DISCORD_WEBHOOK_URL:
     logger.error("La variable d'environnement DISCORD_WEBHOOK_URL est manquante. Veuillez la définir.")
